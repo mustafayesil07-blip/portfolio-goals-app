@@ -1433,9 +1433,15 @@ input[type="range"]::-moz-range-thumb{
         <label class="lbl">Month</label>
         <input type="month" id="f-month"/>
       </div>
-      <div class="field">
-        <label class="lbl">Actual Portfolio Value ($)</label>
-        <input type="number" id="f-portfolio" placeholder="e.g. 115,000" min="0"/>
+      <div class="g2">
+        <div class="field">
+          <label class="lbl">Start Portfolio ($)</label>
+          <input type="number" id="f-start-portfolio" placeholder="e.g. 115,000" min="0"/>
+        </div>
+        <div class="field">
+          <label class="lbl">End Portfolio ($)</label>
+          <input type="number" id="f-portfolio" placeholder="e.g. 122,000" min="0"/>
+        </div>
       </div>
       <div class="g2">
         <div class="field">
@@ -1471,11 +1477,11 @@ const SEED = {
   startValue: 122300,
   milestones: [150000, 250000, 500000],
   months: [
-    {month:'2025-11', actualPortfolio:122300, plannedContribution:7000,  actualContribution:7000,  note:''},
-    {month:'2025-12', actualPortfolio:107200, plannedContribution:8000,  actualContribution:9200,  note:'Year-end bonus deployed'},
-    {month:'2026-01', actualPortfolio:114800, plannedContribution:5000,  actualContribution:5000,  note:''},
-    {month:'2026-02', actualPortfolio:121500, plannedContribution:5000,  actualContribution:4200,  note:'Unexpected expense'},
-    {month:'2026-03', actualPortfolio:130100, plannedContribution:14000, actualContribution:14000, note:'Q1 bonus month'},
+    {month:'2025-11', startPortfolio:null,   actualPortfolio:122300, plannedContribution:7000,  actualContribution:7000,  note:''},
+    {month:'2025-12', startPortfolio:122300, actualPortfolio:107200, plannedContribution:8000,  actualContribution:9200,  note:'Year-end bonus deployed'},
+    {month:'2026-01', startPortfolio:107200, actualPortfolio:114800, plannedContribution:5000,  actualContribution:5000,  note:''},
+    {month:'2026-02', startPortfolio:114800, actualPortfolio:121500, plannedContribution:5000,  actualContribution:4200,  note:'Unexpected expense'},
+    {month:'2026-03', startPortfolio:121500, actualPortfolio:130100, plannedContribution:14000, actualContribution:14000, note:'Q1 bonus month'},
   ],
   projectionInputs: {
     startVal: null,       // null = use current portfolio
@@ -1507,6 +1513,7 @@ function isValidMonth(m) {
 function sanitizeMonth(m) {
   return {
     month:               String(m.month),
+    startPortfolio:      m.startPortfolio   != null ? +m.startPortfolio   : null,
     actualPortfolio:     m.actualPortfolio  != null ? +m.actualPortfolio  : null,
     plannedContribution: m.plannedContribution != null ? +m.plannedContribution : 0,
     actualContribution:  m.actualContribution  != null ? +m.actualContribution  : 0,
@@ -1641,7 +1648,12 @@ function sorted(){return[...state.months].sort((a,b)=>a.month.localeCompare(b.mo
 // ─── MONTHLY PERFORMANCE CALC ─────────────────────────────────
 function calcMonthPerf(m, prevM) {
   const endPortfolio   = m.actualPortfolio ?? null
-  const startPortfolio = prevM?.actualPortfolio ?? null
+  // Use the month's own startPortfolio field (manual input).
+  // Fall back to the previous month's end value only when startPortfolio was not set
+  // (backwards-compat for data saved before this field existed).
+  const startPortfolio = m.startPortfolio != null
+    ? m.startPortfolio
+    : (prevM?.actualPortfolio ?? null)
   const contribution   = m.actualContribution || 0
 
   if (endPortfolio == null || startPortfolio == null) {
@@ -1658,24 +1670,19 @@ function calcMonthPerf(m, prevM) {
     ? (investmentPL / startPortfolio) * 100
     : null
 
-  // Adjusted return: midpoint method (avoids contribution timing bias)
-  const adjustedBase = startPortfolio + contribution / 2
+  // Adjusted return: midpoint method (eliminates contribution timing bias)
+  const adjustedBase   = startPortfolio + contribution / 2
   const adjustedReturn = adjustedBase > 0
     ? (investmentPL / adjustedBase) * 100
     : null
 
-  // Growth split — only meaningful when there's positive total movement
-  const totalMovement = investmentPL + contribution
-  let marketShare = null, contributionShare = null
-  if (totalMovement !== 0) {
-    marketShare       = (investmentPL  / totalMovement) * 100
-    contributionShare = (contribution  / totalMovement) * 100
-  } else if (contribution === 0) {
-    marketShare = 100; contributionShare = 0
-  }
+  // Growth split — abs() keeps bar in [0,100] even for negative PL months
+  const growthBase        = Math.abs(investmentPL) + Math.abs(contribution)
+  const marketShare       = growthBase > 0 ? (Math.abs(investmentPL) / growthBase) * 100 : 0
+  const contributionShare = growthBase > 0 ? (Math.abs(contribution)  / growthBase) * 100 : 0
 
-  // Efficiency: investment P&L per $ contributed (null if no contribution)
-  const efficiency = contribution > 0 ? investmentPL / contribution : null
+  // Efficiency: PL per $ contributed. null → "N/A" when contribution = 0
+  const efficiency = contribution !== 0 ? investmentPL / contribution : null
 
   return { endPortfolio, startPortfolio, contribution,
            investmentPL, returnPct, adjustedReturn,
@@ -2078,11 +2085,12 @@ function renderTimeline(){
 
     // ── Split bar ───────────────────────────────────────────────
     let splitHTML = ''
-    if (perf.marketShare !== null && perf.contributionShare !== null) {
-      const mktW  = Math.max(0, Math.min(100, perf.marketShare)).toFixed(1)
-      const conW  = Math.max(0, Math.min(100, perf.contributionShare)).toFixed(1)
-      const mktLbl = `${perf.marketShare >= 0 ? '' : ''}${Math.abs(perf.marketShare).toFixed(0)}% Market`
-      const conLbl = `${Math.abs(perf.contributionShare).toFixed(0)}% Savings`
+    if (perf.investmentPL !== null) {
+      // marketShare and contributionShare are always in [0,100] — no clamping needed
+      const mktW = perf.marketShare.toFixed(1)
+      const conW = perf.contributionShare.toFixed(1)
+      const mktLbl = `${perf.marketShare.toFixed(0)}% Market`
+      const conLbl = `${perf.contributionShare.toFixed(0)}% Contribution`
       splitHTML = `
       <div class="mr-split-bar">
         <div class="mr-split-market" style="width:${mktW}%"></div>
@@ -2099,8 +2107,9 @@ function renderTimeline(){
     const advItems = []
     if (perf.adjustedReturn !== null)
       advItems.push(`<div class="mr-adv-item"><div class="mr-adv-lbl">Adj Return</div><div class="mr-adv-val">${perf.adjustedReturn >= 0 ? '+' : ''}${perf.adjustedReturn.toFixed(2)}%</div></div>`)
-    if (perf.efficiency !== null)
-      advItems.push(`<div class="mr-adv-item"><div class="mr-adv-lbl">Efficiency</div><div class="mr-adv-val" title="Investment P&L per $1 contributed">${perf.efficiency >= 0 ? '+' : ''}${perf.efficiency.toFixed(2)}x</div></div>`)
+    // Always show Efficiency row when we have PL; "N/A" when contribution = 0
+    if (perf.investmentPL !== null)
+      advItems.push(`<div class="mr-adv-item"><div class="mr-adv-lbl">Efficiency</div><div class="mr-adv-val" title="Investment P&amp;L per $1 contributed">${perf.efficiency !== null ? (perf.efficiency >= 0 ? '+' : '') + perf.efficiency.toFixed(2) + 'x' : 'N/A'}</div></div>`)
     if (gap !== null)
       advItems.push(`<div class="mr-adv-item"><div class="mr-adv-lbl">vs 3% Path</div><div class="mr-adv-val" style="${a?'color:rgba(46,232,154,0.65)':b?'color:rgba(255,107,122,0.65)':''}">${gap>=0?'+':''}${fmt(gap)}</div></div>`)
     if (advItems.length)
@@ -2147,6 +2156,7 @@ function openModal(ms){
     const m=state.months.find(x=>x.month===editM)
     document.getElementById('modal-title').textContent='Edit Month'
     document.getElementById('f-month').value=editM;document.getElementById('f-month').disabled=true
+    document.getElementById('f-start-portfolio').value=m?.startPortfolio??''
     document.getElementById('f-portfolio').value=m?.actualPortfolio??''
     document.getElementById('f-planned').value=m?.plannedContribution??''
     document.getElementById('f-actual-c').value=m?.actualContribution??''
@@ -2155,6 +2165,7 @@ function openModal(ms){
   } else {
     document.getElementById('modal-title').textContent='Add Month'
     document.getElementById('f-month').value='';document.getElementById('f-month').disabled=false
+    document.getElementById('f-start-portfolio').value=''
     document.getElementById('f-portfolio').value=''
     document.getElementById('f-planned').value=''
     document.getElementById('f-actual-c').value=''
@@ -2171,6 +2182,7 @@ function saveMonth(){
   if(!mo){toast('Please select a month');return}
   const row={
     month:mo,
+    startPortfolio:document.getElementById('f-start-portfolio').value!==''?+document.getElementById('f-start-portfolio').value:null,
     actualPortfolio:document.getElementById('f-portfolio').value!==''?+document.getElementById('f-portfolio').value:null,
     plannedContribution:document.getElementById('f-planned').value!==''?+document.getElementById('f-planned').value:0,
     actualContribution:document.getElementById('f-actual-c').value!==''?+document.getElementById('f-actual-c').value:0,
