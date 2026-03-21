@@ -358,6 +358,92 @@ input:disabled{background:rgba(200,185,165,0.30);cursor:not-allowed}
 
 /* ── CHART ── */
 .chart-wrap{position:relative;height:240px}
+
+/* ── CHART TOOLTIP ── */
+#chart-tooltip{
+  position:absolute;
+  background:rgba(20,16,10,0.96);
+  border:1px solid rgba(245,180,60,0.35);
+  border-radius:10px;
+  padding:9px 12px;
+  pointer-events:none;
+  display:none;
+  z-index:50;
+  min-width:140px;
+  box-shadow:0 4px 20px rgba(0,0,0,0.35);
+}
+#chart-tooltip .tt-date{
+  font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+  text-transform:uppercase;letter-spacing:0.1em;
+  color:rgba(245,180,60,0.8);margin-bottom:6px;
+}
+#chart-tooltip .tt-row{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:12px;margin-bottom:3px;font-family:'JetBrains Mono',monospace;font-size:11px;
+}
+#chart-tooltip .tt-row:last-child{margin-bottom:0}
+#chart-tooltip .tt-lbl{color:rgba(255,240,210,0.5)}
+#chart-tooltip .tt-val{color:rgba(255,240,210,0.95);font-weight:700}
+
+/* ── CHART FULLSCREEN BUTTON ── */
+.chart-expand-btn{
+  background:rgba(140,110,80,0.10);
+  border:1px solid var(--bd);
+  border-radius:8px;
+  padding:5px 10px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;font-weight:700;
+  color:var(--mu);cursor:pointer;
+  transition:all 0.15s;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.chart-expand-btn:hover{background:rgba(140,110,80,0.18);color:var(--tx)}
+
+/* ── CHART FULLSCREEN MODAL ── */
+#chart-modal{
+  position:fixed;inset:0;z-index:250;
+  background:rgba(45,36,32,0.65);
+  backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;
+}
+#chart-modal.hidden{display:none}
+#chart-modal-inner{
+  background:rgba(248,243,237,0.98);
+  border:1px solid var(--bd);
+  border-radius:20px;
+  width:100%;max-width:680px;
+  max-height:92dvh;
+  overflow-y:auto;
+  padding:20px;
+  box-shadow:0 8px 40px rgba(140,110,80,0.20);
+}
+#chart-modal-canvas-wrap{position:relative;height:320px;margin-bottom:16px}
+.chart-modal-close{
+  background:rgba(140,110,80,0.10);border:1px solid var(--bd);
+  border-radius:8px;padding:6px 12px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+  color:var(--mu);cursor:pointer;float:right;margin-bottom:12px;
+}
+
+/* ── CHART DATA TABLE ── */
+.chart-table{width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:11px}
+.chart-table th{
+  text-align:right;padding:6px 10px;
+  font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
+  color:var(--mu);border-bottom:2px solid var(--bd);
+}
+.chart-table th:first-child{text-align:left}
+.chart-table td{
+  padding:7px 10px;text-align:right;
+  border-bottom:1px solid var(--bd2);color:var(--tx);font-weight:600;
+}
+.chart-table td:first-child{text-align:left;color:var(--mu)}
+.chart-table tr:last-child td{border-bottom:none}
+.chart-table tr:hover td{background:rgba(140,110,80,0.05)}
+.ct-actual{color:var(--gold)!important}
+.ct-pos{color:var(--green)!important}
+.ct-neg{color:var(--red)!important}
 .chart-summary{
   display:grid;grid-template-columns:1fr 1fr 1fr;
   border-top:1px solid var(--bd2);
@@ -879,11 +965,21 @@ input[type="range"]::-moz-range-thumb{
         <span class="lbl" style="margin-bottom:4px">Trajectory</span>
         <div style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:var(--tx)">Portfolio vs Targets</div>
       </div>
-      <div style="text-align:right">
+      <div style="display:flex;align-items:center;gap:8px">
         <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mu)">2% · 3% · 4%</div>
+        <button class="chart-expand-btn" onclick="openChartModal()">⛶ Genişlet</button>
       </div>
     </div>
-    <div class="chart-wrap"><canvas id="main-chart"></canvas></div>
+    <div class="chart-wrap" style="position:relative">
+      <canvas id="main-chart"></canvas>
+      <div id="chart-tooltip">
+        <div class="tt-date" id="tt-date">—</div>
+        <div class="tt-row"><span class="tt-lbl">Actual</span><span class="tt-val" id="tt-actual">—</span></div>
+        <div class="tt-row"><span class="tt-lbl">2% Hedef</span><span class="tt-val" id="tt-t2">—</span></div>
+        <div class="tt-row"><span class="tt-lbl">3% Hedef</span><span class="tt-val" id="tt-t3">—</span></div>
+        <div class="tt-row"><span class="tt-lbl">4% Hedef</span><span class="tt-val" id="tt-t4">—</span></div>
+      </div>
+    </div>
     <!-- summary row under chart -->
     <div class="chart-summary">
       <div class="cs-item">
@@ -897,6 +993,45 @@ input[type="range"]::-moz-range-thumb{
       <div class="cs-item">
         <div class="cs-lbl">Gap</div>
         <div class="cs-val" id="cs-gap">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHART FULLSCREEN MODAL -->
+  <div id="chart-modal" class="hidden" onclick="closeChartModal(event)">
+    <div id="chart-modal-inner" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;color:var(--tx)">Portfolio vs Targets</div>
+          <div style="font-size:11px;color:var(--mu);margin-top:2px">Dokunarak değerleri görün</div>
+        </div>
+        <button class="chart-modal-close" onclick="closeChartModal()">✕ Kapat</button>
+      </div>
+      <div id="chart-modal-canvas-wrap" style="position:relative">
+        <canvas id="modal-chart"></canvas>
+        <div id="chart-modal-tooltip" style="position:absolute;background:rgba(20,16,10,0.96);border:1px solid rgba(245,180,60,0.35);border-radius:10px;padding:9px 12px;pointer-events:none;display:none;z-index:50;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,0.35)">
+          <div class="tt-date" id="mtt-date">—</div>
+          <div class="tt-row"><span class="tt-lbl">Actual</span><span class="tt-val" id="mtt-actual">—</span></div>
+          <div class="tt-row"><span class="tt-lbl">2% Hedef</span><span class="tt-val" id="mtt-t2">—</span></div>
+          <div class="tt-row"><span class="tt-lbl">3% Hedef</span><span class="tt-val" id="mtt-t3">—</span></div>
+          <div class="tt-row"><span class="tt-lbl">4% Hedef</span><span class="tt-val" id="mtt-t4">—</span></div>
+        </div>
+      </div>
+      <!-- Data table -->
+      <div style="margin-top:4px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mu);margin-bottom:10px">Tablo</div>
+        <table class="chart-table" id="chart-data-table">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>Actual</th>
+              <th>2% Hedef</th>
+              <th>3% Hedef</th>
+              <th>4% Hedef</th>
+            </tr>
+          </thead>
+          <tbody id="chart-table-body"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1818,119 +1953,145 @@ function buildChart(){
   const W=wrap.clientWidth||320,H=wrap.clientHeight||240
   canvas.width=W*dpr;canvas.height=H*dpr
   canvas.style.width=W+'px';canvas.style.height=H+'px'
+  drawChartOnCanvas(canvas,W,H,dpr,'tt-',document.getElementById('chart-tooltip'))
+}
+
+// ─── CHART MODAL ──────────────────────────────────────────────
+function openChartModal(){
+  document.getElementById('chart-modal').classList.remove('hidden')
+  document.body.style.overflow='hidden'
+  // Tabloyu doldur
+  const ms  = window._chartMs || sorted()
+  const data= window._chartPlotData || []
+  const tbody=document.getElementById('chart-table-body')
+  if(tbody){
+    tbody.innerHTML=data.map(p=>{
+      let dateStr
+      if(p.m===null){
+        const first=ms.find(x=>x.startPortfolio!=null)
+        if(first){ const [y,mo]=first.month.split('-').map(Number); const d=new Date(y,mo-1,1); dateStr='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2) } else dateStr='—'
+      } else {
+        const [y,mo]=p.m.month.split('-').map(Number); const d=new Date(y,mo-1,1)
+        dateStr='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)
+      }
+      const act = p.actual!=null ? `<span class="ct-actual">${fmt(p.actual)}</span>` : '<span style="color:var(--mu)">—</span>'
+      return `<tr><td>${dateStr}</td><td>${act}</td><td>${fmt(p.t2)}</td><td>${fmt(p.t3)}</td><td>${fmt(p.t4)}</td></tr>`
+    }).join('')
+  }
+  // Büyük canvas'ı çiz
+  setTimeout(()=>{
+    const wrap=document.getElementById('chart-modal-canvas-wrap')
+    const cvs =document.getElementById('modal-chart')
+    if(!wrap||!cvs)return
+    const dpr=window.devicePixelRatio||1
+    const W=wrap.clientWidth||600, H=320
+    cvs.width=W*dpr; cvs.height=H*dpr
+    cvs.style.width=W+'px'; cvs.style.height=H+'px'
+    drawChartOnCanvas(cvs, W, H, dpr, 'mtt-', document.getElementById('chart-modal-tooltip'))
+  },50)
+}
+function closeChartModal(e){
+  if(e && e.target!==document.getElementById('chart-modal'))return
+  document.getElementById('chart-modal').classList.add('hidden')
+  document.body.style.overflow=''
+}
+
+// ─── SHARED CHART DRAWING (main + modal) ──────────────────────
+function drawChartOnCanvas(canvas, W, H, dpr, ttPfx, tooltipEl){
+  const ms=sorted()
+  if(!ms.length)return
   const C=canvas.getContext('2d')
   C.scale(dpr,dpr);C.clearRect(0,0,W,H)
-
-  const t2=genT(state.startValue,ms,0.02)
-  const t3=genT(state.startValue,ms,0.03)
-  const t4=genT(state.startValue,ms,0.04)
+  const firstMs=ms.find(m=>m.startPortfolio!=null)
+  const chartOrigin=firstMs?.startPortfolio??state.startValue
+  const t2=genT(chartOrigin,ms,0.02)
+  const t3=genT(chartOrigin,ms,0.03)
+  const t4=genT(chartOrigin,ms,0.04)
   const av=ms.map(m=>m.actualPortfolio??null)
   const d2=t2.map(t=>t.target),d3=t3.map(t=>t.target),d4=t4.map(t=>t.target)
-
-  // Prepend startValue as the origin point (index 0) for all series
-  const avPlot=[state.startValue,...av]
-  const d2Plot=[state.startValue,...d2]
-  const d3Plot=[state.startValue,...d3]
-  const d4Plot=[state.startValue,...d4]
-  // Labels: one synthetic "start" label + one per month
-  const labelsPlot=[null,...ms]   // null = startValue origin, no month string needed
+  const avPlot=[chartOrigin,...av], d2Plot=[chartOrigin,...d2], d3Plot=[chartOrigin,...d3], d4Plot=[chartOrigin,...d4]
+  const labelsPlot=[null,...ms]
   const nPlot=avPlot.length
-
-  const padL=56,padR=12,padT=26,padB=42
+  const padL=60,padR=14,padT=28,padB=62
   const cW=W-padL-padR,cH=H-padT-padB
   const allV=[...avPlot.filter(v=>v!=null),...d2Plot,...d3Plot,...d4Plot]
   const minV=Math.min(...allV)*0.974,maxV=Math.max(...allV)*1.023
   const xOf=i=>padL+(i/Math.max(nPlot-1,1))*cW
   const yOf=v=>padT+cH-((v-minV)/(maxV-minV))*cH
-
-  // ── Canvas arka planı ─────────────────────────────────────────
-  C.fillStyle='#1e1a14'
-  C.roundRect(0,0,W,H,12)
-  C.fill()
-
-  // grid
+  C.fillStyle='#1e1a14'; C.fillRect(0,0,W,H)
   C.strokeStyle='rgba(255,255,255,0.07)';C.lineWidth=1
   for(let i=0;i<=4;i++){const y=padT+(i/4)*cH;C.beginPath();C.moveTo(padL,y);C.lineTo(padL+cW,y);C.stroke()}
-  for(let i=0;i<nPlot;i++){
-    C.strokeStyle='rgba(255,255,255,0.04)';C.lineWidth=1
-    C.beginPath();C.moveTo(xOf(i),padT);C.lineTo(xOf(i),padT+cH);C.stroke()
-  }
-
-  // y labels
-  C.fillStyle='rgba(255,240,210,0.55)';C.font='bold 9px JetBrains Mono,monospace';C.textAlign='right'
+  for(let i=0;i<nPlot;i++){C.strokeStyle='rgba(255,255,255,0.04)';C.beginPath();C.moveTo(xOf(i),padT);C.lineTo(xOf(i),padT+cH);C.stroke()}
+  C.fillStyle='rgba(255,240,210,0.60)';C.font='bold 10px JetBrains Mono,monospace';C.textAlign='right'
   for(let i=0;i<=4;i++){const v=minV+((4-i)/4)*(maxV-minV);C.fillText(fmtC(v),padL-8,padT+(i/4)*cH+3.5)}
-
-  // x labels — format: "01 Nov 25"
-  C.textAlign='center';C.fillStyle='rgba(255,240,210,0.55)';C.font='bold 9px JetBrains Mono,monospace'
+  C.fillStyle='rgba(255,240,210,0.60)';C.font='bold 9px JetBrains Mono,monospace'
   labelsPlot.forEach((m,i)=>{
-    const show = nPlot<=7 || i===0 || i===nPlot-1 || i%(Math.ceil((nPlot-1)/4))===0
-    if(!show) return
+    const show=nPlot<=8||i===0||i===nPlot-1||i%(Math.ceil((nPlot-1)/5))===0
+    if(!show)return
     let lbl
-    if(m===null){
-      // Origin point: derive "01 [Mon] [YY]" from first month minus one
-      const first=ms[0]?.month
-      if(first){
-        const [y,mo]=first.split('-').map(Number)
-        const d=new Date(y,mo-2,1) // one month before first entry
-        lbl='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(d.getFullYear()).slice(2)
-      } else { lbl='' }
-    } else {
-      const [y,mo]=m.month.split('-').map(Number)
-      const d=new Date(y,mo-1,1)
-      lbl='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)
-    }
-    C.fillText(lbl,xOf(i),H-padB+14)
+    if(m===null){const f=ms.find(x=>x.startPortfolio!=null);if(f){const[y,mo]=f.month.split('-').map(Number);const d=new Date(y,mo-1,1);lbl='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)}}
+    else{const[y,mo]=m.month.split('-').map(Number);const d=new Date(y,mo-1,1);lbl='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)}
+    if(!lbl)return
+    C.save();C.translate(xOf(i),H-padB+10);C.rotate(-Math.PI/2);C.textAlign='right';C.fillText(lbl,0,3);C.restore()
   })
-
   function line(data,color,dash,width){
-    C.strokeStyle=color;C.lineWidth=width||1.5
-    C.setLineDash(dash||[]);C.lineJoin='round';C.lineCap='round'
+    C.strokeStyle=color;C.lineWidth=width||1.5;C.setLineDash(dash||[]);C.lineJoin='round';C.lineCap='round'
     C.beginPath();let s=false
     data.forEach((v,i)=>{if(v==null)return;const x=xOf(i),y=yOf(v);s?(C.lineTo(x,y)):(C.moveTo(x,y),s=true)})
     C.stroke();C.setLineDash([])
   }
-
-  // dashed targets — daha görünür
   line(d2Plot,'rgba(110,200,240,0.55)',[6,4],1.5)
-  line(d3Plot,'rgba(245,180,60,0.55)', [6,4],1.5)
+  line(d3Plot,'rgba(245,180,60,0.55)',[6,4],1.5)
   line(d4Plot,'rgba(190,160,255,0.55)',[6,4],1.5)
-
-  // actual area gradient
   const af=avPlot.map((v,i)=>v!=null?{v,i}:null).filter(Boolean)
   if(af.length>=2){
-    C.beginPath()
-    af.forEach(p=>C.lineTo(xOf(p.i),yOf(p.v)))
+    C.beginPath();af.forEach(p=>C.lineTo(xOf(p.i),yOf(p.v)))
     C.lineTo(xOf(af[af.length-1].i),padT+cH);C.lineTo(xOf(af[0].i),padT+cH);C.closePath()
-    const gr=C.createLinearGradient(0,padT,0,padT+cH)
-    gr.addColorStop(0,'rgba(245,166,35,0.22)');gr.addColorStop(0.6,'rgba(245,166,35,0.06)');gr.addColorStop(1,'transparent')
+    const gr=C.createLinearGradient(0,padT,0,padT+cH);gr.addColorStop(0,'rgba(245,166,35,0.22)');gr.addColorStop(0.6,'rgba(245,166,35,0.06)');gr.addColorStop(1,'transparent')
     C.fillStyle=gr;C.fill()
   }
-
-  // actual line
-  C.save();C.shadowColor='rgba(245,166,35,0.7)';C.shadowBlur=10
-  line(avPlot,'#f5a623',[],2.5);C.restore()
-
-  // dots
+  C.save();C.shadowColor='rgba(245,166,35,0.7)';C.shadowBlur=10;line(avPlot,'#f5a623',[],2.5);C.restore()
   avPlot.forEach((v,i)=>{
     if(v==null)return
-    const x=xOf(i),y=yOf(v)
-    const isLast=(i===nPlot-1||avPlot.slice(i+1).every(w=>w==null))
-    C.save()
-    if(isLast){C.shadowColor='rgba(245,166,35,0.9)';C.shadowBlur=14}
+    const x=xOf(i),y=yOf(v),isLast=(i===nPlot-1||avPlot.slice(i+1).every(w=>w==null))
+    C.save();if(isLast){C.shadowColor='rgba(245,166,35,0.9)';C.shadowBlur=14}
     C.beginPath();C.arc(x,y,isLast?6:3.5,0,Math.PI*2);C.fillStyle='#1e1a14';C.fill()
-    C.beginPath();C.arc(x,y,isLast?4.5:2.5,0,Math.PI*2);C.fillStyle='#f5a623';C.fill()
-    C.restore()
+    C.beginPath();C.arc(x,y,isLast?4.5:2.5,0,Math.PI*2);C.fillStyle='#f5a623';C.fill();C.restore()
   })
-
-  // legend
   const legs=[{l:'Actual',c:'rgba(245,166,35,1)',d:false},{l:'2%',c:'rgba(110,200,240,0.9)',d:true},{l:'3%',c:'rgba(245,180,60,0.9)',d:true},{l:'4%',c:'rgba(190,160,255,0.9)',d:true}]
   let lx=padL;C.font='bold 9px JetBrains Mono,monospace';C.textAlign='left'
   legs.forEach(lg=>{
     C.strokeStyle=lg.c;C.lineWidth=lg.d?1.5:2.2;C.setLineDash(lg.d?[4,3]:[])
     C.beginPath();C.moveTo(lx,11);C.lineTo(lx+14,11);C.stroke();C.setLineDash([])
-    C.fillStyle='rgba(255,240,210,0.75)';C.fillText(lg.l,lx+18,15)
-    lx+=C.measureText(lg.l).width+32
+    C.fillStyle='rgba(255,240,210,0.75)';C.fillText(lg.l,lx+18,15);lx+=C.measureText(lg.l).width+32
   })
+  // Tooltip
+  if(tooltipEl){
+    const plotData=labelsPlot.map((m,i)=>({m,i,actual:avPlot[i],t2:d2Plot[i],t3:d3Plot[i],t4:d4Plot[i],x:xOf(i)}))
+    function showTT(clientX){
+      const rect=canvas.getBoundingClientRect()
+      const px=(clientX-rect.left)*(W/rect.width)
+      let best=0,bestDist=Infinity
+      plotData.forEach((p,i)=>{const d=Math.abs(p.x-px);if(d<bestDist){bestDist=d;best=i}})
+      const p=plotData[best];if(!p)return
+      let dateStr
+      if(p.m===null){const f=ms.find(x=>x.startPortfolio!=null);if(f){const[y,mo]=f.month.split('-').map(Number);const d=new Date(y,mo-1,1);dateStr='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)}}
+      else{const[y,mo]=p.m.month.split('-').map(Number);const d=new Date(y,mo-1,1);dateStr='01 '+d.toLocaleString('en-US',{month:'short'})+' '+String(y).slice(2)}
+      document.getElementById(ttPfx+'date').textContent=dateStr||'—'
+      document.getElementById(ttPfx+'actual').textContent=p.actual!=null?fmt(p.actual):'—'
+      document.getElementById(ttPfx+'t2').textContent=fmt(p.t2)
+      document.getElementById(ttPfx+'t3').textContent=fmt(p.t3)
+      document.getElementById(ttPfx+'t4').textContent=fmt(p.t4)
+      const scaleX=rect.width/W,ttW=tooltipEl.offsetWidth||150
+      let left=p.x*scaleX-ttW/2;left=Math.max(4,Math.min(rect.width-ttW-4,left))
+      tooltipEl.style.left=left+'px';tooltipEl.style.top='4px';tooltipEl.style.display='block'
+    }
+    canvas.addEventListener('mousemove',e=>showTT(e.clientX))
+    canvas.addEventListener('touchstart',e=>{e.preventDefault();showTT(e.touches[0].clientX)},{passive:false})
+    canvas.addEventListener('touchmove',e=>{e.preventDefault();showTT(e.touches[0].clientX)},{passive:false})
+    canvas.addEventListener('mouseleave',()=>{tooltipEl.style.display='none'})
+    canvas.addEventListener('touchend',()=>{setTimeout(()=>{tooltipEl.style.display='none'},1800)})
+  }
 }
 
 // ─── DASHBOARD ─────────────────────────────────────────────────
