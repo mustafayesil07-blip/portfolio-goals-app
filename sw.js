@@ -1,4 +1,4 @@
-const CACHE = 'wealtharc-v2';
+const CACHE = 'wealtharc-v3';
 const CORE = ['/Wealth-Arc/', '/Wealth-Arc/index.html'];
 
 self.addEventListener('install', function(e) {
